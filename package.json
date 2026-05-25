@@ -1,0 +1,30 @@
+{
+  "name": "cea-daily-control",
+  "version": "1.0.0",
+  "description": "Sistema de controle de jornada — Coelho & Araújo Advocacia",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "vercel": "vercel dev"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.106.1",
+    "connect-pg-simple": "^10.0.0",
+    "cookie-session": "^2.1.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "helmet": "^8.2.0",
+    "multer": "^2.1.1",
+    "pg": "^8.21.0",
+    "uuid": "^14.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

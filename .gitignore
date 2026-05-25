@@ -1,5 +1,5 @@
-# Dependências
 node_modules/
-
-# Variáveis de ambiente
 .env
+*.log
+.DS_Store
+uploads/
