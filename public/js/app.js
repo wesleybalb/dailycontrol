@@ -59,7 +59,6 @@ function fmtData(str) {
 
 // ── Tabs ──────────────────────────────────────────────────
 async function selectTab(el, usuarioId, nomeCompleto) {
-  // Atualiza estado visual das tabs
   document.querySelectorAll('.tab').forEach(t => {
     t.classList.remove('active');
     t.setAttribute('aria-selected', 'false');
@@ -67,20 +66,15 @@ async function selectTab(el, usuarioId, nomeCompleto) {
   el.classList.add('active');
   el.setAttribute('aria-selected', 'true');
 
-  // Atualiza estado global
   window.CEA.tabUsuarioId   = usuarioId;
   window.CEA.tabUsuarioNome = nomeCompleto;
 
-  const primeiroNome = nomeCompleto.split(' ')[0];
   document.getElementById('tab-title').textContent = nomeCompleto;
   document.getElementById('tab-sub').textContent   = '· carregando...';
 
   const ehMeu = usuarioId === window.CEA.usuarioId;
-
-  // Atualiza botão novo registro
   _atualizarBtnNovo(ehMeu, null);
 
-  // Mostra loading na tabela
   document.getElementById('tabela-registros').innerHTML =
     `<tr class="loading-row"><td colspan="5"><i class="ti ti-loader-2 spin"></i> Carregando...</td></tr>`;
 
@@ -90,7 +84,6 @@ async function selectTab(el, usuarioId, nomeCompleto) {
     _renderStats(stats);
     document.getElementById('tab-sub').textContent = `· últimos 10 registros`;
 
-    // Atualiza botão com info do registro de hoje desta tab
     if (ehMeu) {
       const hoje = new Date().toISOString().split('T')[0];
       const regHoje = registros.find(r => r.data_registro === hoje) || null;
@@ -209,14 +202,12 @@ async function novoRegistro() {
     _atualizarBtnNovo(true, registro);
     await abrirRegistro(registro.id);
   } catch (err) {
-    // Se já existe, tenta abrir
     if (err.message.includes('Já existe')) {
       showToast('Já existe um registro para hoje. Abrindo...', 'error');
       if (window.CEA.registroHojeId) await abrirRegistro(window.CEA.registroHojeId);
     } else {
       showToast(err.message, 'error');
     }
-    // Restaura botão
     _atualizarBtnNovo(true, null);
   }
 }
@@ -233,12 +224,10 @@ async function abrirRegistro(id) {
   }
 }
 
-// verRegistro abre o modal em modo de visualização forçada
 async function verRegistro(id) {
   _showModalLoading();
   try {
     const { registro } = await api('GET', `/registro/${id}`);
-    // Força soLeitura independente do estado editavel
     registro._forcarLeitura = true;
     _renderModal(registro);
   } catch (err) {
@@ -264,20 +253,17 @@ function _hideModal() {
 
 function fecharModal() {
   _hideModal();
-  // Recarrega tabela da tab ativa
   const tabAtiva = document.querySelector('.tab.active');
   if (tabAtiva && window.CEA.tabUsuarioId) {
     selectTab(tabAtiva, window.CEA.tabUsuarioId, window.CEA.tabUsuarioNome || window.CEA.tabUsuarioId);
   }
 }
 
-// Fecha ao clicar no overlay
 document.addEventListener('DOMContentLoaded', () => {
   const overlay = document.getElementById('modal-overlay');
   if (overlay) {
     overlay.addEventListener('click', e => { if (e.target === overlay) fecharModal(); });
   }
-  // Fecha com ESC
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       const ov = document.getElementById('modal-overlay');
@@ -288,10 +274,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Modal: renderizar ─────────────────────────────────────
 function _renderModal(registro) {
-  const soLeitura = !registro.editavel || registro._forcarLeitura;
-  const pct       = registro.percentual || 0;
+  const soLeitura  = !registro.editavel || registro._forcarLeitura;
+  const pct        = registro.percentual || 0;
   const concluidos = registro.itens_concluidos || 0;
-  const total     = registro.total_itens || 0;
+  const total      = registro.total_itens || 0;
 
   const blocos = { inicio: [], meio: [], final: [] };
   (registro.checklist_itens || []).forEach(i => {
@@ -364,7 +350,6 @@ function _renderModal(registro) {
 function _renderItem(item, soLeitura) {
   const done = item.concluido;
 
-  // Checkbox — soLeitura não tem onclick
   const checkAttr = soLeitura
     ? `aria-checked="${done}" tabindex="-1"`
     : `onclick="toggleItem('${item.id}',${!done})" role="checkbox" aria-checked="${done}" tabindex="0"`;
@@ -384,12 +369,7 @@ function _renderItem(item, soLeitura) {
          <button class="evidence-btn" style="margin-left:4px;" onclick="removerEvidencia('${item.id}')" title="Remover evidência">
            <i class="ti ti-trash" style="font-size:9px;" aria-hidden="true"></i>
          </button>`;
-  } else if (done && !item.evidencia_url && !soLeitura) {
-    // Marcado mas sem evidência ainda
-    evidEl = `<button class="evidence-btn" onclick="uploadEvidencia('${item.id}')">
-      <i class="ti ti-upload" style="font-size:10px;" aria-hidden="true"></i> anexar
-    </button>`;
-  } else if (!done && !soLeitura) {
+  } else if (!soLeitura) {
     evidEl = `<button class="evidence-btn" onclick="uploadEvidencia('${item.id}')">
       <i class="ti ti-upload" style="font-size:10px;" aria-hidden="true"></i> anexar
     </button>`;
@@ -413,7 +393,6 @@ async function toggleItem(itemId, concluido) {
   } catch (err) {
     showToast(err.message, 'error');
     if (box) box.classList.remove('loading');
-    // Restaura onclick
     if (box) box.onclick = () => toggleItem(itemId, concluido);
   }
 }
@@ -426,8 +405,8 @@ function uploadEvidencia(itemId) {
   input.onchange = async () => {
     if (!input.files[0]) return;
     const file = input.files[0];
-    if (file.size > 10 * 1024 * 1024) {
-      showToast('Arquivo muito grande. Máximo 10 MB.', 'error');
+    if (file.size > 4 * 1024 * 1024) {
+      showToast('Arquivo muito grande. Máximo 4 MB.', 'error');
       return;
     }
     const fd = new FormData();
@@ -491,10 +470,8 @@ async function fecharRegistro(registroId) {
     await api('PATCH', `/registro/${registroId}/fechar`, { observacoes: obs });
     showToast('Registro fechado com sucesso!');
     await _recarregarModal(registroId);
-    // Atualiza stat card
     const el = document.getElementById('stat-today');
     if (el) el.textContent = 'Fechado';
-    // Atualiza botão
     _atualizarBtnNovo(true, { id: registroId, status: 'fechado', editavel: false });
   } catch (err) {
     showToast(err.message, 'error');
@@ -509,7 +486,108 @@ async function _recarregarModal(registroId) {
   _renderModal(registro);
 }
 
-// ── Admin: salvar usuário (criar ou editar) ───────────────
+// ── Admin: editor de template do checklist ────────────────
+let _templateUsuarioId = null;
+
+async function abrirEditorTemplate(usuarioId, nomeUsuario) {
+  _templateUsuarioId = usuarioId;
+
+  const editor = document.getElementById('editor-template');
+  const titulo = document.getElementById('editor-template-titulo');
+  const blocos = document.getElementById('editor-blocos');
+
+  titulo.textContent = `Checklist de ${nomeUsuario}`;
+  blocos.innerHTML   = `<div style="padding:20px;text-align:center;color:var(--text2);">
+    <i class="ti ti-loader-2 spin"></i> Carregando...
+  </div>`;
+
+  editor.style.display = 'block';
+  editor.scrollIntoView({ behavior: 'smooth' });
+
+  try {
+    const { template } = await api('GET', `/admin/usuario/${usuarioId}/template`);
+    _renderEditorBlocos(template);
+  } catch (err) {
+    blocos.innerHTML = `<p style="color:var(--red-text);font-size:13px;">Erro ao carregar template: ${err.message}</p>`;
+    showToast(err.message, 'error');
+  }
+}
+
+function _renderEditorBlocos(itens) {
+  const blocos = { inicio: [], meio: [], final: [] };
+  itens.forEach(i => { if (blocos[i.bloco]) blocos[i.bloco].push(i); });
+
+  const nomes = {
+    inicio: { label: 'Início do expediente', icon: 'ti-sun-rise' },
+    meio:   { label: 'Meio do dia',           icon: 'ti-sun'      },
+    final:  { label: 'Final do expediente',   icon: 'ti-sun-off'  }
+  };
+
+  const html = Object.entries(blocos).map(([bloco, items]) => {
+    if (!items.length) return '';
+    const meta = nomes[bloco];
+    const campos = items.map(item => `
+      <div class="check-item" style="padding:8px 0;">
+        <div style="
+          width:6px;height:6px;border-radius:50%;
+          background:var(--gold);flex-shrink:0;margin-top:6px;">
+        </div>
+        <input
+          class="form-input"
+          type="text"
+          data-item-id="${item.id}"
+          value="${item.tarefa.replace(/"/g, '&quot;')}"
+          style="flex:1;font-size:12.5px;padding:6px 10px;"
+        />
+      </div>`).join('');
+
+    return `<div class="checklist-block" style="margin-bottom:16px;">
+      <div class="block-label">
+        <i class="ti ${meta.icon}" aria-hidden="true"></i> ${meta.label}
+      </div>
+      ${campos}
+    </div>`;
+  }).join('');
+
+  document.getElementById('editor-blocos').innerHTML = html;
+}
+
+async function salvarTemplate() {
+  if (!_templateUsuarioId) return;
+
+  const inputs = document.querySelectorAll('#editor-blocos input[data-item-id]');
+  const itens  = Array.from(inputs).map(input => ({
+    id:    input.dataset.itemId,
+    tarefa: input.value.trim()
+  }));
+
+  const vazios = itens.filter(i => !i.tarefa);
+  if (vazios.length) {
+    showToast('Nenhum item pode ficar em branco.', 'error');
+    return;
+  }
+
+  const btn = document.querySelector('#editor-template .btn-primary');
+  if (btn) { btn.disabled = true; btn.innerHTML = `<i class="ti ti-loader-2 spin"></i> Salvando...`; }
+
+  try {
+    await api('PUT', `/admin/usuario/${_templateUsuarioId}/template`, { itens });
+    showToast('Checklist atualizado com sucesso!');
+    fecharEditorTemplate();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = `<i class="ti ti-check"></i> Salvar checklist`; }
+  }
+}
+
+function fecharEditorTemplate() {
+  const editor = document.getElementById('editor-template');
+  if (editor) editor.style.display = 'none';
+  _templateUsuarioId = null;
+}
+
+// ── Admin: salvar usuário (criar) ─────────────────────────
 async function salvarUsuario() {
   const editId = document.getElementById('edit-usuario-id').value.trim();
   const nome   = document.getElementById('new-nome').value.trim();
@@ -521,8 +599,6 @@ async function salvarUsuario() {
     showToast('Nome e e-mail são obrigatórios.', 'error');
     return;
   }
-
-  // Modo criação: senha obrigatória
   if (!editId && !senha) {
     showToast('Informe uma senha para o novo usuário.', 'error');
     return;
@@ -536,35 +612,14 @@ async function salvarUsuario() {
   if (btn) { btn.disabled = true; btn.innerHTML = `<i class="ti ti-loader-2 spin"></i> Salvando...`; }
 
   try {
-    if (editId) {
-      // Edição: por ora atualiza apenas role e ativo via endpoint existente
-      // (endpoint completo de edição de nome/email pode ser adicionado futuramente)
-      showToast('Edição de nome/e-mail em desenvolvimento. Use reset de senha para alterar a senha.', 'error');
-    } else {
-      await api('POST', '/admin/usuario', { nome, email, senha, role });
-      showToast(`Usuário ${nome} criado com sucesso!`);
-      setTimeout(() => location.reload(), 1600);
-    }
+    await api('POST', '/admin/usuario', { nome, email, senha, role });
+    showToast(`Usuário ${nome} criado com sucesso!`);
+    setTimeout(() => location.reload(), 1600);
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = `<i class="ti ti-check"></i> <span id="btn-salvar-label">Criar usuário</span>`; }
   }
-}
-
-// ── Admin: preencher form para edição ─────────────────────
-function editarUsuario(id, nome, email, role) {
-  document.getElementById('edit-usuario-id').value = id;
-  document.getElementById('new-nome').value  = nome;
-  document.getElementById('new-email').value = email;
-  document.getElementById('new-role').value  = role;
-  document.getElementById('new-senha').value = '';
-  document.getElementById('new-senha').placeholder = 'Deixe em branco para não alterar';
-  document.getElementById('form-card-titulo').textContent = `Editar: ${nome}`;
-  document.getElementById('btn-salvar-label').textContent = 'Salvar alterações';
-  document.getElementById('btn-cancelar-edicao').style.display = 'inline-flex';
-  document.getElementById('senha-hint').textContent = '(deixe em branco para não alterar)';
-  document.getElementById('admin-form-card').scrollIntoView({ behavior: 'smooth' });
 }
 
 function cancelarEdicao() {

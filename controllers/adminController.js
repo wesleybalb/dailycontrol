@@ -1,11 +1,11 @@
 'use strict';
 
-const usuarioModel = require('../models/usuarioModel');
-const auditModel   = require('../models/auditModel');
+const { supabaseAdmin } = require('../config/supabase');
+const usuarioModel      = require('../models/usuarioModel');
+const auditModel        = require('../models/auditModel');
 
 // ─────────────────────────────────────────────────────────────
 // GET /admin
-// Renderiza o painel de gestão de usuários.
 // ─────────────────────────────────────────────────────────────
 async function showAdmin(req, res) {
   try {
@@ -19,7 +19,6 @@ async function showAdmin(req, res) {
 
 // ─────────────────────────────────────────────────────────────
 // POST /admin/usuario
-// Cria um novo usuário (Auth + perfil em public.usuarios).
 // ─────────────────────────────────────────────────────────────
 async function criarUsuario(req, res) {
   const { nome, email, senha, role } = req.body;
@@ -38,12 +37,12 @@ async function criarUsuario(req, res) {
     const usuario = await usuarioModel.create({ nome, email, senha, role: roleValido });
 
     await auditModel.log({
-      usuarioId:       req.usuario.id,
-      acao:            'usuario_criado',
-      tabelaAlvo:      'usuarios',
-      registroAlvoId:  usuario.id,
-      payload:         { nome, email, role: roleValido },
-      ip:              req.ip
+      usuarioId:      req.usuario.id,
+      acao:           'usuario_criado',
+      tabelaAlvo:     'usuarios',
+      registroAlvoId: usuario.id,
+      payload:        { nome, email, role: roleValido },
+      ip:             req.ip
     });
 
     res.status(201).json({ ok: true, usuario });
@@ -59,11 +58,9 @@ async function criarUsuario(req, res) {
 
 // ─────────────────────────────────────────────────────────────
 // PATCH /admin/usuario/:id/ativo
-// Ativa ou desativa um usuário.
-// Admin não pode desativar a si mesmo.
 // ─────────────────────────────────────────────────────────────
 async function toggleAtivo(req, res) {
-  const { id } = req.params;
+  const { id }   = req.params;
   const { ativo } = req.body;
 
   if (id === req.usuario.id) {
@@ -74,11 +71,11 @@ async function toggleAtivo(req, res) {
     const atualizado = await usuarioModel.setAtivo(id, Boolean(ativo));
 
     await auditModel.log({
-      usuarioId:       req.usuario.id,
-      acao:            ativo ? 'usuario_ativado' : 'usuario_desativado',
-      tabelaAlvo:      'usuarios',
-      registroAlvoId:  id,
-      ip:              req.ip
+      usuarioId:      req.usuario.id,
+      acao:           ativo ? 'usuario_ativado' : 'usuario_desativado',
+      tabelaAlvo:     'usuarios',
+      registroAlvoId: id,
+      ip:             req.ip
     });
 
     res.json({ ok: true, usuario: atualizado });
@@ -91,7 +88,6 @@ async function toggleAtivo(req, res) {
 
 // ─────────────────────────────────────────────────────────────
 // POST /admin/usuario/:id/reset-senha
-// Dispara e-mail de redefinição de senha via Supabase Auth.
 // ─────────────────────────────────────────────────────────────
 async function resetSenha(req, res) {
   const { id } = req.params;
@@ -103,11 +99,11 @@ async function resetSenha(req, res) {
     await usuarioModel.sendPasswordReset(usuario.email);
 
     await auditModel.log({
-      usuarioId:       req.usuario.id,
-      acao:            'senha_reset_solicitado',
-      tabelaAlvo:      'usuarios',
-      registroAlvoId:  id,
-      ip:              req.ip
+      usuarioId:      req.usuario.id,
+      acao:           'senha_reset_solicitado',
+      tabelaAlvo:     'usuarios',
+      registroAlvoId: id,
+      ip:             req.ip
     });
 
     res.json({ ok: true, mensagem: `E-mail de redefinição enviado para ${usuario.email}.` });
@@ -118,4 +114,72 @@ async function resetSenha(req, res) {
   }
 }
 
-module.exports = { showAdmin, criarUsuario, toggleAtivo, resetSenha };
+// ─────────────────────────────────────────────────────────────
+// GET /admin/usuario/:id/template
+// Retorna os itens do checklist template de um usuário.
+// ─────────────────────────────────────────────────────────────
+async function getTemplate(req, res) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('checklist_template')
+      .select('id, bloco, ordem, tarefa')
+      .eq('usuario_id', req.params.id)
+      .order('bloco')
+      .order('ordem');
+
+    if (error) return res.status(500).json({ ok: false, erro: error.message });
+
+    res.json({ ok: true, template: data });
+
+  } catch (err) {
+    console.error('[getTemplate]', err.message);
+    res.status(500).json({ ok: false, erro: 'Erro ao carregar template.' });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// PUT /admin/usuario/:id/template
+// Salva as alterações do checklist template de um usuário.
+// ─────────────────────────────────────────────────────────────
+async function salvarTemplate(req, res) {
+  try {
+    const { itens } = req.body; // [{ id, tarefa }, ...]
+
+    if (!Array.isArray(itens) || itens.length === 0) {
+      return res.status(400).json({ ok: false, erro: 'Nenhum item enviado.' });
+    }
+
+    const updates = itens.map(item =>
+      supabaseAdmin
+        .from('checklist_template')
+        .update({ tarefa: item.tarefa.trim() })
+        .eq('id', item.id)
+        .eq('usuario_id', req.params.id)  // garante que o item pertence ao usuário
+    );
+
+    await Promise.all(updates);
+
+    await auditModel.log({
+      usuarioId:      req.usuario.id,
+      acao:           'template_editado',
+      tabelaAlvo:     'checklist_template',
+      registroAlvoId: req.params.id,
+      ip:             req.ip
+    });
+
+    res.json({ ok: true });
+
+  } catch (err) {
+    console.error('[salvarTemplate]', err.message);
+    res.status(500).json({ ok: false, erro: 'Erro ao salvar template.' });
+  }
+}
+
+module.exports = {
+  showAdmin,
+  criarUsuario,
+  toggleAtivo,
+  resetSenha,
+  getTemplate,
+  salvarTemplate
+};
