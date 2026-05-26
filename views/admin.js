@@ -4,8 +4,8 @@ const layout = require('./layout');
 
 module.exports = function adminView(usuario, usuarios) {
   const rows = usuarios.map(u => {
-    const ini    = u.nome.split(' ').map(n => n[0]).slice(0, 2).join('');
-    const ehVoce = u.id === usuario.id;
+    const ini         = u.nome.split(' ').map(n => n[0]).slice(0, 2).join('');
+    const ehVoce      = u.id === usuario.id;
     const nomeEscaped = u.nome.replace(/'/g, "\\'");
 
     const rolePill = u.role === 'admin'
@@ -16,22 +16,24 @@ module.exports = function adminView(usuario, usuarios) {
       ? `<span class="badge badge-success">Ativo</span>`
       : `<span class="badge badge-danger">Inativo</span>`;
 
-    const acoes = ehVoce
-      ? `<span class="cell-muted" style="font-size:11px;">—</span>`
-      : `<div class="actions">
-          <button class="act-btn" title="Editar checklist"
-            onclick="abrirEditorTemplate('${u.id}','${nomeEscaped}')">
-            <i class="ti ti-list-check" aria-hidden="true"></i>
-          </button>
-          <button class="act-btn" title="${u.ativo ? 'Desativar' : 'Reativar'}"
-            onclick="toggleAtivo('${u.id}',${!u.ativo})">
-            <i class="ti ti-${u.ativo ? 'user-off' : 'user-check'}" aria-hidden="true"></i>
-          </button>
-          <button class="act-btn" title="Redefinir senha"
-            onclick="resetSenha('${u.id}','${nomeEscaped}')">
-            <i class="ti ti-key" aria-hidden="true"></i>
-          </button>
-        </div>`;
+    // Botão de checklist aparece para TODOS, inclusive o próprio admin
+    const btnChecklist = `
+      <button class="act-btn" title="Editar checklist"
+        onclick="abrirEditorTemplate('${u.id}','${nomeEscaped}')">
+        <i class="ti ti-list-check" aria-hidden="true"></i>
+      </button>`;
+
+    const btnToggle = ehVoce ? '' : `
+      <button class="act-btn" title="${u.ativo ? 'Desativar' : 'Reativar'}"
+        onclick="toggleAtivo('${u.id}',${!u.ativo})">
+        <i class="ti ti-${u.ativo ? 'user-off' : 'user-check'}" aria-hidden="true"></i>
+      </button>`;
+
+    const btnReset = ehVoce ? '' : `
+      <button class="act-btn" title="Redefinir senha"
+        onclick="resetSenha('${u.id}','${nomeEscaped}')">
+        <i class="ti ti-key" aria-hidden="true"></i>
+      </button>`;
 
     return `<tr class="${!u.ativo ? 'row-inativo' : ''}">
       <td class="cell">
@@ -44,7 +46,11 @@ module.exports = function adminView(usuario, usuarios) {
       <td class="cell cell-muted">${u.email}</td>
       <td class="cell">${rolePill}</td>
       <td class="cell">${statusPill}</td>
-      <td class="cell">${acoes}</td>
+      <td class="cell">
+        <div class="actions">
+          ${btnChecklist}${btnToggle}${btnReset}
+        </div>
+      </td>
     </tr>`;
   }).join('');
 
@@ -78,7 +84,7 @@ module.exports = function adminView(usuario, usuarios) {
       <span id="editor-template-titulo">Checklist de —</span>
     </div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:14px;">
-      Edite os textos das tarefas. As alterações valem para os próximos registros criados por este colaborador.
+      Edite, adicione ou remova tarefas. As alterações valem para os próximos registros criados por este colaborador.
     </p>
 
     <div id="editor-blocos"></div>
