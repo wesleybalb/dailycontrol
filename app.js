@@ -2,10 +2,10 @@
 
 require('dotenv').config();
 
-const express      = require('express');
+const express       = require('express');
 const cookieSession = require('cookie-session');
-const helmet       = require('helmet');
-const path         = require('path');
+const helmet        = require('helmet');
+const path          = require('path');
 
 // ── Validate env ──────────────────────────────────────────
 const required = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_KEY', 'SESSION_SECRET'];
@@ -19,44 +19,25 @@ for (const key of required) {
 const app = express();
 
 // ── Security headers ──────────────────────────────────────
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc:  ["'self'"],
-      scriptSrc:   ["'self'", "'unsafe-inline'"],
-      styleSrc:    ["'self'", "'unsafe-inline'",
-                   'https://fonts.googleapis.com',
-                   'https://cdn.jsdelivr.net'],
-      fontSrc:     ["'self'",
-                   'https://fonts.gstatic.com',
-                   'https://cdn.jsdelivr.net'],
-      imgSrc:      ["'self'", 'data:', 'https://*.supabase.co'],
-      connectSrc:  ["'self'",
-                   'https://*.supabase.co',
-                   'https://*.supabase.io'],
-      workerSrc:   ["'self'", 'blob:'],
-    }
-  }
-}));
+// CSP desabilitado — scripts inline e CDNs externos são necessários.
+// Os demais headers de segurança do Helmet permanecem ativos.
+app.use(helmet({ contentSecurityPolicy: false }));
 
 // ── Body parsers ──────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ── Sessão stateless via cookie assinado ──────────────────
-// Funciona em ambientes serverless (Vercel) pois não precisa
-// de armazenamento externo — o estado fica no cookie do cliente.
 app.use(cookieSession({
-  name:   'cea.sid',
-  keys:   [process.env.SESSION_SECRET],
-  maxAge: 8 * 60 * 60 * 1000,  // 8 horas
-  secure: process.env.NODE_ENV === 'production',
+  name:     'cea.sid',
+  keys:     [process.env.SESSION_SECRET],
+  maxAge:   8 * 60 * 60 * 1000,
+  secure:   process.env.NODE_ENV === 'production',
   sameSite: 'lax',
   httpOnly: true,
 }));
 
-// Compatibilidade: cookie-session não tem .destroy() —
-// adicionamos um shim para que o código existente funcione.
+// Shim: cookie-session não tem .destroy()
 app.use((req, _res, next) => {
   if (!req.session.destroy) {
     req.session.destroy = (cb) => {
@@ -98,9 +79,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ ok: false, erro: 'Erro interno do servidor.' });
 });
 
-// ── Exporta para Vercel (serverless) E roda localmente ───
-// No Vercel: api/index.js importa este módulo e o expõe.
-// Localmente: node app.js ou npm run dev sobe o servidor.
+// ── Exporta para Vercel E roda localmente ─────────────────
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
@@ -108,7 +87,6 @@ if (require.main === module) {
     console.log(`   http://localhost:${PORT}`);
     console.log(`   Ambiente: ${process.env.NODE_ENV || 'development'}\n`);
 
-    // Cron local: bloqueia rascunhos expirados à meia-noite
     const registroModel = require('./models/registroModel');
     (function agendar() {
       const agora  = new Date();
